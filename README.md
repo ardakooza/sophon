@@ -1,470 +1,359 @@
 <p align="center">
-  <img src="assets/sophon-banner.png" alt="sophon logo" width="620" />
+  <img src="assets/sophon-banner.png" alt="Sophon" width="760" />
 </p>
 
-<h1 align="center">Sophon Genesis 0.0.1</h1>
+<h1 align="center">Sophon</h1>
 
-<p align="center">
-  Policy-driven language and runtime for `.sph`, `.xaf`, and `.svt` files.
-</p>
+<p align="center"><strong>Politikayla sınırlandırılmış programlama dili ve çalışma zamanı</strong></p>
 
-Sophon, `.sph` kaynak dosyaları, `.xaf` politika dosyaları ve `.svt` veri
-dosyalarıyla çalışan küçük, politikaya bağlı bir dil ve çalışma zamanıdır.
-
-**Bu README bir giriş belgesidir.** Tüm blokların tüm argümanları, şemaları,
-çalışma zamanı kuralları ve hata kodlarının tamamı
-**[`SYNTAX.md`](SYNTAX.md)** içindedir.
-
-```bash
-sophon --help
-sophon --version
-sophon run program.sph
-sophon agent -f program.sph -m "Selam."
-sophon agent -f program.sph -t "Görev bir"
-```
-
-## İlk program
-
-XAF politikası gerektiren özellikleri kullanan program bir XAF'a bağlanır. XAF dosyası ilk
-çalıştırmada kendiliğinden oluşturulabilir; mevcut elle yazılmış politika korunur.
-
-```bash
-mkdir -p proje && cd proje
-cat > merhaba.sph <<'SPH'
-connect to merhaba.xaf
-state ad = "Dunya"
-state greeting = "Merhaba, {ad}"
-surface { greeting }
-SPH
-sophon run merhaba.sph
-```
-
-```text
-Merhaba, Dunya
-```
-
-**Bir XAF birden fazla SPH programı tarafından kullanılabilir.** `config.default-policy`
-Agent bağlamayan programlar için varsayılan politikayı seçer. Aynı XAF'ı kullanan
-programların ihtiyaç duyduğu izinlerin bu politikada bulunduğundan emin olun.
-
-Launcher çalıştırılabilir olmalıdır. Paylaşımlı depodan kopyalama izin bitlerini
-düşürür:
-
-```bash
-chmod +x sophon sophon.py
-```
+<p align="center">Bir programı yaz. Yetkilerini açıkça tanımla. Sophon çalışma zamanında yürüt.</p>
 
 ---
 
-## Dilin omurgası
+Sophon, `.sph` programlarını çalıştırır. Programın kullanabileceği kaynak ve işlemler `.xaf` politikasıyla belirlenir; kalıcı kayıtlar `.svt` Vault dosyalarında tutulur. Dil; durum, kullanıcı etkileşimi, dosya ve veri işlemleri, gözlem, terminal bileşenleri ve Agent çağrıları için tek bir sözdizimi sunar.
 
-Sophon'da 24 deyim vardır ve hepsi [`SYNTAX.md`](SYNTAX.md) bölüm 5'te
-listelenmiştir. En çok kullanılanlar:
+Bu README, ilk programdan bütün ana bileşenlere kadar kısa bir yol haritasıdır. Her sözdizimi kuralının ve hata kodunun tam açıklaması [SYNTAX.md](SYNTAX.md), XAF politikalarının tam şeması [XAF_V2_SCHEMA.md](XAF_V2_SCHEMA.md) içindedir.
 
-| Deyim | Rol |
-|---|---|
-| `state` / `multi-state` | Durum bildirimi |
-| `surface` | Konsola çıktı |
-| `ask` / `confirmation` | Kullanıcıdan girdi |
-| `observer` / `multi-observer` | İç ve dış kaynak gözlemi |
-| `database` | Sophon Vault okuma/yazma |
-| `file` | Dosya sistemi işlemleri |
-| `execute` | Alt program veya komut çalıştırma |
-| `agent` | Ajan çağrısı |
-| `function` | Tipli parametre, yerel kapsam ve tekli/çoklu dönüşlü fonksiyon |
-| `component` | Terminal kutuları |
+## Mimari: üç dosya, tek çalışma akışı
 
-`state`, `multi-state`, `surface`, `ask`, `multi-ask`, `confirmation`,
-`multi-confirmation`, `connect` ve `function` **çekirdektir**, `use` gerektirmez.
-Geri kalan modüller içe aktarılmalıdır:
+| Dosya | Rol | İçerik |
+|---|---|---|
+| `.sph` | Program | Durumlar, ifadeler, kullanıcı etkileşimi ve modül çağrıları |
+| `.xaf` | Kontrol ve politika | İzinler, Agent ayarları, dosya yolu sınırları ve bileşen profilleri |
+| `.svt` | Sophon Vault | `database` modülünün kullandığı kayıtlar |
 
-```sph
-use { database observer multi-observer agent }
-use { component }              // component'in tüm kutu türleri
-use { list from component }    // yalnızca liste kutusu
+```mermaid
+flowchart LR
+    DEV[Program yazarı] --> SPH[Program.sph]
+    SPH --> PARSER[Sophon ayrıştırıcı]
+    PARSER --> RT[Çalışma zamanı]
+    SPH -. "connect to" .-> XAF[Politika.xaf]
+    XAF --> CONFIG[config: kaynak ve bileşen ayarları]
+    XAF --> POLICY[policy: access, action, deny]
+    CONFIG --> GATE{İzin denetimi}
+    POLICY --> GATE
+    RT --> CORE[Çekirdek: state, set, ask, confirmation, surface, function]
+    RT --> UI[component: form, note, list, table]
+    RT --> DB[database]
+    DB --> VAULT[.svt Sophon Vault]
+    RT --> FILE[file]
+    FILE --> FS[İzinli proje dosyaları]
+    RT --> EXEC[execute]
+    EXEC --> CHILD[Alt .sph programı]
+    RT --> OBS[observer ve multi-observer]
+    RT --> LOCAL[datetime ve random]
+    RT --> AGENT[Agent]
+    AGENT --> PROVIDER[Uzak model sağlayıcısı]
+    GATE -->|izin verilen işlem| EFFECT[Kaynağa erişim]
+    GATE -->|reddedildi| ERR[Hata ve tanı]
+    CORE --> EFFECT
+    UI --> EFFECT
+    DB --> EFFECT
+    FILE --> EFFECT
+    EXEC --> EFFECT
+    OBS --> EFFECT
+    LOCAL --> EFFECT
+    AGENT --> EFFECT
+    EFFECT --> OUT[Terminal ve form çıktısı]
 ```
 
-## Fonksiyonlar
+`.sph` yürütülür. `.xaf` doğrudan çalıştırılmaz; `connect to dosya.xaf` ile programa bağlanır. Bağlı XAF yoksa Sophon ilk çalıştırmada bir tane üretebilir. Mevcut elle yazılmış XAF dosyası korunur. Üretilen politikayı dağıtımdan önce kontrol edin ve gereken en az yetkiyle sınırlandırın.
 
-Fonksiyonlar `function { id input execute output }` ile tanımlanır. Parametreler
-tipli olabilir, default veya optional değer alabilir. Tekli ve çoklu dönüş desteklenir.
-Ayrıntılar [`FUNCTIONS_DESIGN.md`](FUNCTIONS_DESIGN.md) içindedir.
+## 1. Kur ve ilk programını çalıştır
 
-Control Flow henüz parser/runtime'a uygulanmamıştır. Tasarımda `decide / when / otherwise`
-koşul blokları, `not/and/or`, `!=`/`≠`, `>=`/`≥`, `<=`/`≤` ve açık `set` güncellemesi
-kullanılır. Ayrıntılar [`CONTROL_FLOW_DESIGN.md`](CONTROL_FLOW_DESIGN.md) içindedir.
+Repo içindeki launcher için Python 3 gerekir; ayrı paket kurulumu gerekmez:
 
-Agent sandbox mimarisi, Linux gereksinimleri ve güvenlik sınırları [`SANDBOX.md`](SANDBOX.md) içinde açıklanır.
-Son Functions/Sandbox/Policy uygulama ve test sonuçları [`SOPHON_FUNCTIONS_SANDBOX_POLICY_REPORT_20261109.md`](SOPHON_FUNCTIONS_SANDBOX_POLICY_REPORT_20261109.md) içindedir.
+```bash
+git clone https://github.com/ardakooza/sophon.git
+cd sophon
+./sophon --version
+./sophon --help
+```
 
-## Blok yerleşimi
+`hello.sph` adında bir dosya oluştur:
 
-Bir blok tek satıra da birkaç satıra da yazılabilir; iki biçim tamamen aynıdır.
+```sph
+connect to hello.xaf
+use { random }
+
+state name = "Sophon"
+state greeting = "Merhaba, {name}!"
+state dice = random.integer(1, 6)
+
+state result_text = "Zar sonucu: {dice}"
+
+surface {
+    greeting
+    result_text
+}
+```
+
+Çalıştır:
+
+```bash
+./sophon run hello.sph
+```
+
+İlk çalıştırmada `hello.xaf` oluşabilir. Programın dosyaları şöyle görünür:
+
+```text
+proje/
+├── hello.sph       # yürütülen program
+├── hello.xaf       # programın izin ve bileşen ayarları
+└── data.svt        # gerekirse: Vault kayıtları
+```
+
+`state` değerleri metin, tam sayı, ondalık sayı, boolean, null, liste veya nesne olabilir. Tipi başlangıç değerinden çıkartabilir ya da `state age: integer = 18` biçiminde belirtebilirsin. Metin içine `{state_adi}` yazarak değer ekleyebilirsin. Sayısal ifadelerde `+ - * / ^`, parantez ve `sqrt(...)` desteklenir. `set name = "Ada"` önceden tanımlanmış bir durumu günceller ve türünü korur.
+
+## 2. Programın çalışma sırası
+
+Sophon en üst düzey deyimleri ayrıştırır; çalışma zamanı etkileri belirli aşamalarda yürütür:
+
+```mermaid
+flowchart TD
+    A[.sph dosyasını oku] --> B[use ve connect bilgilerini çöz]
+    B --> C[Durumları, ifadeleri ve fonksiyonları hazırla]
+    C --> D{Gerekli XAF izinleri var mı?}
+    D -->|Hayır| E[Hata: işlem reddedilir]
+    D -->|Evet| F[Agent çağrıları]
+    F --> G[Vault işlemleri]
+    G --> H[Dosya işlemleri]
+    H --> I[Alt Sophon programları]
+    I --> J[ask ve confirmation]
+    J --> K[surface ve terminal bileşenleri]
+    K --> L[observer kayıtları]
+```
+
+Üst düzey aşama sırası `agents → databases → file → execute → ask → surface → observers` şeklindedir. Bu yüzden üst düzey `surface`, kaynak dosyada bir `ask` satırından önce dursa da sorular önce alınır. `form` içindeki adımlar ise tek tek, yazıldıkları sırayla yürür; form içinde bir `surface` kullanmadan önce gösterilecek durumu oluştur.
+
+## 3. Dil bileşenleri
+
+### Temel dil
+
+Bu deyimler için `use` gerekmez:
+
+| Deyim | Ne yapar |
+|---|---|
+| `connect` | Bir XAF politikasına bağlanır |
+| `state`, `set` | Tekil durumu oluşturur veya günceller |
+| `multi-state` | Alanları adlandırılmış bir grup durum tutar |
+| `surface` | Metin ve durumları terminale yazar |
+| `ask`, `multi-ask` | Kullanıcıdan bir veya birden çok değer alır |
+| `confirmation`, `multi-confirmation` | Seçenek sunar; tekli veya çoklu yanıt alır |
+| `function` | Tipli parametrelerle yerel fonksiyon tanımlar |
+
+`multi-state`, `multi-ask`, `multi-confirmation` ve `multi-observer` için XAF'ta hem `config.multi` içinde ilgili ad hem de `policy.access.multi` izni gerekir. Bunları sıradan tekil `state`/`ask` özellikleriyle karıştırma.
+
+Bir gruplu durum şu şekilde bildirilir ve alanına `person.name` biçiminde erişilir:
 
 ```sph
 multi-state {
-    id = "user"
+    id = "person"
     state {
-        ad = "Arda"
-        yas = 31
+        name = "Ada"
+        age = 31
     }
 }
 
-multi-state {
-    id = "user"
-    state { yas = 32 }
-}
+state greeting = "Merhaba, {person.name}"
 ```
 
-## Yorumlar
+### Modüller
 
-`//` tek yorum biçimidir ve satır sonuna kadar geçerlidir.
+Modül kullanmadan önce `use { ... }` ile içe aktar. Gereken izinler modüle göre değişir. `datetime` ve `random` için modül izni gerekmez; ancak her `.sph` programı yine de bir XAF'a `connect` ile bağlanmalıdır.
 
-**Yorum her yerde kabul edilmez.** `//` satırları standart statement parser'larında işlenir; ancak bazı bloklar özel ham içerik ayrıştırıcısı kullanır. Bu nedenle yorumların davranışı bloğa göre değişir:
-
-| Blok | Yorum satırı davranışı |
-|---|---|
-| `surface` | İçerik öğesi gibi yorumlanır ve `S252` verebilir. |
-| `ask` | Geçersiz ayar olarak `S167` verir. |
-| `choice` | Geçersiz seçenek girdisi olarak `S180` verir. |
-| `note`, `list`, `table`, `form` | Kendi içerik satırı kurallarına göre yorum satırlarını görmezden gelir. |
-
-Yorumu en güvenli şekilde özel içerik bloklarının dışına koyun.
-
-## İfadeler ve metin interpolation
-
-Expression Engine sayısal `+`, `-`, `*`, `/`, `^` ve `sqrt()` işlemlerini destekler.
-String birleştirme için `+` kullanılmaz; metin içinde `{state_name}` kullanılır.
-
-```sph
-state a = 1
-state b = 2
-state total = a + b
-state name = "Dunya"
-state greeting = "Merhaba, {name}"
-surface { total greeting }
-```
-
-Metin birleştirmede `+` kullanılmaz. `surface`, `note`, `list` ve `table`
-metninde de eski `+` birleştirme biçimi reddedilir (`S251`). Sayısal işlemi önce
-bir state'e atayın; metin içine değer eklemek için `{state_name}` kullanın.
-
-Liste değerleri köşeli parantezle yazılır, virgül isteğe bağlıdır ve tırnaksız
-sözcük **sabit metindir**:
-
-```sph
-state secim   = [gece aylik]     // [gece, aylik]
-state sayilar = [1 2, 3]
-state bos     = []
-```
-
-## Çalışma zamanı sırası
-
-```text
-agents → databases → file → execute → ask → surface → observers
-```
-
-**En önemli ayrım:** en üst düzeyde **önce bütün `ask`'ler sorulur**, sonra
-bütün `surface` blokları çizilir. Bu yüzden en üst düzeyde `surface` ile `ask`'in
-kaynak sırası önemsizdir. Ama bir `form` **içinde** adımlar tek tek kaynak
-sırasına göre çalışır ve bir `surface` satırı, dolduran `ask`'ten önce gelirse
-`S102` alır.
-
-```sph
-// En üst düzey: sorun yok.
-surface { ad }
-ask { id = "a1" prompt = "Adınız:" state = ad }
-
-// Form içi: HATA (S102).
-form {
-    surface { ad }
-    ask { id = "a1" prompt = "Adınız:" state = ad }
-}
-```
-
-## Tam SPH/XAF referansı
-
-Bütün uygulanmış SPH deyimlerinin ve iç içe bileşenlerinin referansı için
-[`SPH_XAF_COMPLETE_REFERENCE.md`](SPH_XAF_COMPLETE_REFERENCE.md) dosyasına bakın.
-Güncel XAF v2 şeması için [`XAF_V2_SCHEMA.md`](XAF_V2_SCHEMA.md) esas alınmalıdır.
-
-## Yerel standart kütüphane: `datetime`
-
-`datetime`, XAF izni gerektirmeyen yerel standart kütüphanedir ve açıkça içe aktarılır:
-
-```sph
-use { datetime }
-
-state today = date
-state current_time = time
-state day = date.day
-state month = date.month
-state year = date.year
-state weekday = date.weekday
-state timezone = date.timezone
-state hour = time.hour
-state minute = time.minute
-state second = time.second
-```
-
-| Yerleşik değer | Tip | Anlam |
+| Modül | Sağladığı özellikler | XAF gereksinimi |
 |---|---|---|
-| `date` | string | Yerel tarih, `YYYY-MM-DD` |
-| `date.day` | integer | Ayın günü, `1..31` |
-| `date.month` | integer | Ay, `1..12` |
-| `date.year` | integer | Yıl |
-| `date.weekday` | integer | ISO 8601 haftanın günü: Pazartesi `1`, Pazar `7` |
-| `date.timezone` | string | Yerel IANA saat dilimi adı; bulunamazsa sistemin saat dilimi kısaltması/ofseti |
-| `time` | string | Yerel saat, `HH:MM:SS` |
-| `time.hour` | integer | Saat, `0..23` |
-| `time.minute` | integer | Dakika, `0..59` |
-| `time.second` | integer | Saniye, `0..59` |
+| `datetime` | Yerel tarih ve saat: `date`, `time`, alanları | Hayır; yerel standart kütüphane |
+| `random` | `integer`, `float`, `boolean`, `choice` | Hayır; yerel standart kütüphane |
+| `database` | `.svt` Vault kayıtlarını okuma/yazma/değiştirme/silme | `access.database` ve ilgili eylem izni |
+| `observer`, `multi-observer` | Durumları veya başka `.sph` kaynaklarını izleme | Observer profili, kaynak izni ve okuma izni |
+| `component` | Terminal kutularını bir araya getirme | Gruplu `component` için `access.component` |
+| `file` | Proje içi dosya ve klasör işlemleri | İzinli yollar ve ayrıntılı dosya sistemi izinleri |
+| `execute` | İzin listesinde bulunan başka `.sph` programını çalıştırma | `access.execute` ve XAF dosya izin listesi |
+| `agent` | Yapılandırılmış Agent'a mesaj veya görev gönderme | Agent, politika ve sağlayıcı yapılandırması |
 
-Tarih ve saat, program ayrıştırılırken tek bir yerel zaman anından alınır; böylece bütün alanlar birbiriyle tutarlıdır. `date` ve `time` adları datetime modülü yüklendiğinde ayrılmış yerleşik adlardır.
+`math`, `system`/`sys` ve `multi-agent` bu sürümde uygulanmış modüller değildir. `random` Python'ın sıradan sözde rastgele üretecini kullanır; parola, token veya güvenlik anahtarı üretmek için uygun değildir.
 
-`surface` içinde de doğrudan kullanılabilir:
+### Fonksiyonlar
+
+Fonksiyonlar tipli parametre, varsayılan veya isteğe bağlı değer ve tekli ya da çoklu çıktı destekler:
 
 ```sph
-surface {
-    date
-    time
-    date.weekday
-    date.timezone
+function {
+    id = "double"
+    input { value: integer }
+    execute {
+        state result = value * 2
+    }
+    output: integer = result
+}
+
+state answer = double(21)
+surface { answer }
+```
+
+Fonksiyonların yerel durumları çağrı dışına sızmaz. Fonksiyon içindeki `set`, parametreleri veya daha önce tanımlanmış yerel durumları günceller; dış durumlar salt okunurdur. Bu sürümde fonksiyon ifadeleri program durumları ayrıştırılırken değerlendirilir; sonradan alınan kullanıcı yanıtı veya Agent sonucu fonksiyon girdisi olarak kullanılamaz.
+
+### Kullanıcı arayüzü ve terminal bileşenleri
+
+`component` bir veya daha çok kutuyu gruplar. `note` metin, `list` öğeler, `table` satır ve sütunlar gösterir. `form`, `ask`, `confirmation` ve `surface` adımlarını tek bir etkileşimli akışta birleştirir.
+
+```sph
+use { component }
+
+component {
+    id = "summary"
+    note { title = "Durum" text = "Hazır" }
+    list { title = "Özellikler" item = "Politika" item = "Vault" }
+    table { title = "Kayıt" row "ad" "Ada" row "yas" 31 }
 }
 ```
 
-## XAF kontrol katmanı
+## 4. XAF: izinler nasıl işler?
 
-XAF v2, sistem ayarlarını tek `config {}` bloğunda; Agent kayıtlarını `agent {}`
-bloklarında; erişim ve işlem izinlerini sayısal kimlikli `policy {}` bloklarında
-tutar. `access` kaynak yeteneğini, `action` yapılabilecek işlemi belirler.
+XAF iki tür bilgi taşır:
+
+1. `config` bileşen ayarlarını ve kaynak sınırlarını tanımlar.
+2. `policy` programa hangi yetenek ve eylemlerin verildiğini tanımlar.
+
+Bir yetenek izni, o yeteneğin her işlemini otomatik olarak açmaz. Örneğin dosya okuma için `file-system` erişiminin yanında izinli proje yolu, dosya okuma ayarı ve `action.read` gerekir. Olmayan veya `false` olan izin reddedilir.
+
+```mermaid
+flowchart LR
+    CODE[.sph isteği] --> CAP{policy.access}
+    CAP -->|yetenek açık| ACT{policy.action}
+    CAP -->|kapalı| DENY[reddet]
+    ACT -->|işlem açık| CFG{config sınırları}
+    ACT -->|kapalı| DENY
+    CFG -->|yol, profil ve modül uygun| RUN[işlemi yürüt]
+    CFG -->|sınır dışı| DENY
+```
+
+Örnek XAF iskeleti:
 
 ```xaf
 config {
-    default-policy = 2001
-    agent {
-        permission { execute = true }
-        timing { delay = 60 timeout = 180 }
-        input { max-token = 12000 }
-        output { max-token = 4096 }
-        connection { provider = "openrouter" model = "provider/model-id" key = "OPENROUTER_API_KEY" }
-    }
-}
-
-agent { id = 1001 name = "Research Agent" policy = 2001 }
-
-policy {
-    id = 2001
-    access { agent multi observer }
-    action { read = true write = true }
-}
-```
-
-Tam, zorunlu/opsiyonel alanları ve çalışma zamanı davranışlarını içeren şema:
-[`XAF_V2_SCHEMA.md`](XAF_V2_SCHEMA.md).
-Eski ad tabanlı XAF biçimleri yalnızca geriye dönük uyumluluk için okunur.
-
-## Yerel standart kütüphaneler
-
-Sophon'un yerel standart kütüphane ailesi dört modülden oluşacak:
-
-| Modül | Durum | Amaç |
-|---|---|---|
-| `math` | Planlandı | Matematiksel fonksiyonlar ve sabitler |
-| `datetime` | Uygulandı | Yerel tarih ve saat |
-| `system` (`sys`) | Planlandı | Çalışma zamanı ve sistem bilgileri |
-| `random` | Uygulandı | Rastgele değerler ve seçimler |
-
-`datetime` ve `random` yerel olarak kullanılabilir. `math` ve `system` (`sys`) sonraki aşamalara bırakılmıştır.
-
-## Modüller
-
-`state`, `multi-state`, `surface`, `ask`, `multi-ask`, `confirmation`,
-`multi-confirmation`, `connect` çekirdektir. Kalan her şey içe aktarılmalıdır:
-
-| Modül | Ne açar |
-|---|---|
-| `database` | `database` bloğu |
-| `observer` | Yalnızca `observer` bloğu |
-| `multi-observer` | Yalnızca `multi-observer` bloğu |
-| `agent` | `agent connect/run/task` |
-| `component` | `form`, `note`, `list`, `table` kutuları |
-| `file` | `file` bloğu |
-| `execute` | `execute` bloğu |
-| `datetime` | Yerel tarih ve saat değerleri (`date`, `time`) |
-| `random` | Rastgele değer üretimi ve listeden seçim (`random.integer`, `random.float`, `random.boolean`, `random.choice`) |
-
-`datetime` ve `random`, XAF izni gerektirmeyen yerel standart kütüphanelerdir. Diğer modüller mevcut XAF/politika kurallarına tabidir. Bilinmeyen modül `S111`, yinelenen içe aktarma `S112`, kullanılan ama içe aktarılmamış modül `S112`/`S114` verir.
-
-## Gözlem
-
-`observer` hem yerel hem harici kaynakları izler. Her gözlemcinin benzersiz bir
-`id`, `source` ve en az bir `watch` bileşeni olmalıdır.
-
-```sph
-use { observer }
-
-state level = 12
-multi-state { id = "user" state { name = "Arda" age = 18 } }
-
-observer {
-    id = "user-watch"
-    source = self
-    watch {
-        user
-        user.age
-        level
-    }
-}
-```
-
-Harici kaynak için `source = "main.sph"` kullanılır. Birden fazla gözlemci
-`multi-observer` içinde gruplanabilir. `observer` ve `multi-observer` ayrı
-modüllerdir; grup kullanımı için `use { multi-observer }` gerekir ve ayrıca
-`use { observer }` gerekmez. `observe` ve bağımsız `self-observer`
-deyimleri kaldırılmıştır. `watch { self-observation }` için kaynak `.sph`
-dosyasının bağlı olduğu XAF'ta `features { self-observation = true }` olmalıdır. Ayrıntı:
-[`SYNTAX.md` bölüm 16-17](SYNTAX.md#16-observer-ve-multi-observer--birleşik-gözlem-sistemi).
-
-## Dosya ve execute
-
-Her dosya işlemi proje dizini içinde kalır ve `file-system` yetkisi ister. Yeten
-iki bağımsız ekseni vardır: dosya ve klasör.
-
-```xaf
-policy app.sph {
-    access {
-        file-system {
-            allowed_path { "cikti" "arsiv.zip" }
-            forbidden_path { "cikti/private" }
-            action {
-                file { create read modify }
-                folder { create read zip-unzip }
-            }
+    default-policy = 1001
+    multi { multi-state multi-ask multi-confirmation multi-observer }
+    file-system {
+        allowed_path { "data" "output" }
+        forbidden_path { "data/private" }
+        action {
+            file { create read modify copy move delete }
+            folder { create read modify copy move delete zip-unzip }
         }
     }
-    action { read = true }
+}
+
+policy {
+    id = 1001
+    access { database file-system execute observer component }
+    action {
+        read = true
+        write = true
+        modify = true
+        create = true
+        remove = false
+    }
 }
 ```
 
-```sph
-use { file }
+XAF v2'de `access` yetenekleri ile `action` izinleri birbirinden ayrıdır. `deny`, kalıtılan izinleri iptal edebilir ve alt politika grant'lerinden önce gelir. Dosya yolları proje kökünün dışına çıkamaz; `forbidden_path`, `allowed_path` içinde olsa bile reddedilir. Yetki tanımlarken gerekmeyen erişimleri açma.
 
-file {
-    mkdir { path = "cikti" }
-    write { path = "cikti/rapor.txt" data = "hazir" }
-    read  { path = "cikti/rapor.txt" state = rapor }
-    list  { path = "cikti" state = dosyalar }
-    zip   { path = "cikti" to = "arsiv.zip" }
+## 5. Veri ve yan etki bileşenleri
+
+### Sophon Vault (`.svt`)
+
+`.svt`, `vault` ve `record` bloklarından oluşan metin tabanlı yerel kayıt dosyasıdır:
+
+```svt
+vault {
+    record {
+        id = 1
+        name = "Ada"
+        age = 31
+        tags = ["matematik" "bilim"]
+    }
 }
-surface { rapor }
 ```
 
-`copy`, `move`, `zip` ve `unzip` için `to` zorunludur. Yollar önce çözülür ve
-proje içinde olduğu doğrulanır (`F010`, `F012`), **sonra** politika sorgulanır;
-izin verilen bir klasörü adıyla yazmak yol kaçışı sağlayamaz.
-
-`execute.command` **kabuğa asla gitmez**; komutlar iç bir kayıt defterinden
-çözülür ve bu defter şu anda boştur, dolayısıyla her komut reddedilir (`X054`).
-`execute.file` başka bir programı **kendi politikasıyla** çalıştırır ve derinlik
-sınırı 4'tür (`S234`).
-
-Ayrıntı: [`SYNTAX.md` bölüm 21-22](SYNTAX.md#21-file--dosya-işlemleri).
-
-
-## Yerel standart kütüphane: `random`
-
-`random`, XAF izni gerektirmeyen yerel standart kütüphanedir. Açıkça içe aktarılır:
+SPH programı Vault'ı bir takma adla kullanır:
 
 ```sph
-use { random }
+use { database }
 
-state dice = random.integer(1, 6)
-state probability = random.float()
-state enabled = random.boolean()
-state color = random.choice(["red", "green", "blue"])
+database users {
+    connect = data/users.svt
+    read { id = 1 state = selected_user }
+}
 ```
 
-| Fonksiyon | Dönüş tipi | Davranış |
-|---|---|---|
-| `random.integer(min, max)` | integer | İki sınır dahil rastgele tam sayı üretir. |
-| `random.float()` | float | `0.0` dahil, `1.0` hariç rastgele sayı üretir. |
-| `random.boolean()` | boolean | Rastgele `true` veya `false` üretir. |
-| `random.choice(list)` | Listenin eleman tipi | Boş olmayan listeden bir eleman seçer. |
+Her kaydın benzersiz `id` alanı olmalıdır. Vault yolu proje içinde çözülür; güncellemeler atomik kaydedilir. Erişim ve `read`/`write`/`modify`/`remove` eylemleri XAF ile denetlenir.
 
-`random.integer` için iki sınır da integer olmalı ve minimum maksimumdan büyük olmamalıdır. `random.choice` boş liste kabul etmez. Her çağrı yeni bir değer üretir; aynı programdaki sonuçlar sabit değildir. Bu üreteç kriptografik değildir; parola, token veya güvenlik anahtarı üretmek için kullanılmamalıdır.
+### Dosyalar ve alt programlar
 
-## Bu dağıtımın içeriği
+`file` modülü dosya oluşturma, okuma, yazma, ekleme, listeleme, kopyalama, taşıma, silme ve arşivleme işlemlerini yapar. Tüm yollar proje kökü ve `config.file-system` sınırları içinde kalır. `execute` başka bir `.sph` dosyasını kendi politikasıyla çalıştırabilir. Kayıtlı Sophon komutları bu sürümde bulunmadığından `command` kullanılamaz.
 
-```text
-sophon.py       çalışma zamanı
-sophon          launcher
-AGENT.md        zorunlu ajan çalışma şartnamesi
-README.md       bu belge — giriş
-SYNTAX.md       söz dizimi ve hata kataloğu
-XAF_V2_SCHEMA.md XAF v2 yapılandırma / izin şeması
-test_regressions.py regresyon testleri
-test_language_integration.py gerçek .sph/.xaf/.svt entegrasyon testleri
-run_audit_corpus.py ayrı Sophon programlarından oluşan çalıştırılabilir denetim paketi
-audit_suite/    ayrı çalıştırılabilir Sophon test programları ve kaynak dosyaları
-check_docs.py   belge kod blokları ve hata kataloğu kapsamını denetler
+### Observer
+
+`observer`, tek bir kaynakta durum veya alanları; `multi-observer` birden fazla tanımı izler. Kaynak `self` (mevcut program) ya da başka bir `.sph` dosyası olabilir. XAF'ta eşleşen sayısal Observer profili, kaynak sınıfı izni ve okuma izni gerekir. `self-observation` özelliği ayrıca XAF'ta etkinleştirilir.
+
+## 6. Agent ve sandbox sınırları
+
+Agent ayarları XAF'ta tanımlanır: sayısal Agent kimliği, politika kimliği, sağlayıcı/model, API anahtarının ortam değişkeni adı, girdi/çıktı token limitleri ve zaman aşımı. Gizli anahtarı XAF'a veya kaynak dosyaya yazma; anahtarı belirtilen ortam değişkeninde tut.
+
+SPH içinden Agent'a bağlanıp mesaj göndermenin biçimi:
+
+```sph
+use { agent }
+agent connect { id = 1001 }
 ```
 
-## Hatalar
+Agent isteği ayrıca `access.agent`, `action.read` ve Agent kaydında `permission.execute = true` gerektirir. Agent kullanımı sağlayıcıya ağ isteği gönderebilir ve yanıt maliyeti doğurabilir.
 
-Kodlar alt sistemlere göre gruplanır ve her biri tek bir koşula karşılık gelir.
+`security.container = true` seçeneği Linux user/mount/PID/UTS/IPC/network namespace ve `chroot` tabanlı yalıtımı kullanır. Bu yalıtım yalnızca Agent sağlayıcı isteği sürecine uygulanır; genel amaçlı kod veya araç çalıştırma sandbox'ı değildir. Gerekli Linux özellikleri yoksa çalışma zamanı güvenli olmayan moda düşmek yerine isteği `A035` ile reddeder. Teknik ayrıntı ve bilinen sınırlar [SANDBOX.md](SANDBOX.md) içindedir.
 
-| Önek | Alt sistem | Örnek |
-|---|---|---|
-| `S1xx`, `S2xx` | SPH dili | `S100` bilinmeyen deyim, `S238` çoklu seçim için `requirement` şart |
-| `X0xx` | Kontrol düzlemi | `X025` politika yok, `X054` komut yetkisi yok |
-| `V0xx` | Sophon Vault | `V005` vault dosyası yok, `V011` geçersiz değer |
-| `A0xx` | Ajan | `A012` yürütme reddedildi, `A027` program dosyası yok, `A031` gecikme geçersiz |
-| `F0xx` | Dosya sistemi | `F010` mutlak yol, `F012` proje dışı, `F019` dosya yok |
-| `O2xx` | Gözlem | `O201` kaynak dosya yok, `O207` self-observation özelliği kapalı |
-| `W0xx` | Kurtarılmış koşullar | `W001` okunamayan gözlem günlüğü |
+## 7. Şimdiki kapsam ve sınırlar
 
-**Hata kodlarının tamamı** [`SYNTAX.md` sonundaki katalogda](SYNTAX.md#hata-ve-uyarı-kataloğu)
-listelenmiştir.
+| Özellik | Durum |
+|---|---|
+| Durum, ifadeler, fonksiyonlar, girdi/çıktı ve modüller | Uygulandı; ayrıntılar SYNTAX referansında |
+| Koşullu dallanma (`resolve / when / otherwise`) | Tasarım aşamasında; henüz çalıştırılamaz |
+| Mantıksal operatörler ve karşılaştırmalar | Control Flow ile birlikte henüz uygulanmadı |
+| Multi-Agent / Agent takımları | Tasarım/yol haritası; çalıştırılabilir modül değil |
+| `math`, `system`/`sys` | Henüz uygulanmadı |
+| `execute command` | Komut kayıt defteri boş; bu sürümde kullanılamaz |
+| Agent sandbox | Linux'a bağlı; yalnızca sağlayıcı isteği sürecini yalıtır |
 
-Kurtarılmış bir koşul sessizce yutulmaz; okunamayan bir gözlem günlüğü
-`.corrupt` ekiyle kenara alınır ve `stderr`'e bildirilir, çalışma sürer:
+Yani bu sürümde `if/else` yazılamaz. Tasarım belgeleri gelecek sözdizimini anlatır, çalışan dil özelliği olarak değerlendirilmemelidir.
 
-```text
-SophonWarning [W001] Observation log is unreadable (...); its history was not recorded this run.
-  --> logs/2026-09-27.json
+## 8. Komutlar ve proje belgeleri
+
+```bash
+./sophon --help
+./sophon --version
+./sophon run program.sph
+./sophon agent -f program.sph -m "Selam."
+./sophon agent -f program.sph -t "Bu görevi yap."
+
+python3 test_regressions.py
+python3 -m unittest -v test_language_integration.py
+python3 check_docs.py
+python3 run_audit_corpus.py
 ```
 
-## Notlar
+Test ve denetim komutları isteğe bağlı doğrulama araçlarıdır. `run_audit_corpus.py` oluşturduğu denetim verilerini geçici bir klasörde tutar.
 
-- Bu dağıtımda hazır `.sph`, `.xaf` veya `.svt` örnek projesi **yoktur**. Kendi
-  programınızı yazın; XAF bağlantı sırasında otomatik üretilebilir.
-- `test_regressions.py` eski davranışları koruyan regresyon testleridir:
-  `python3 test_regressions.py`.
-- `test_language_integration.py` gerçek dosyalarda çalışma zamanı testleridir:
-  `python3 -m unittest -v test_language_integration.py`.
-- `check_docs.py`, SYNTAX/XAF örneklerini gerçek parser'dan geçirir ve hata kodu
-  kataloğunun tamlığını denetler: `python3 check_docs.py`.
-- `run_audit_corpus.py`, `audit_suite/` içindeki ayrı SPH/XAF/SVT programlarını
-  çalıştırarak manuel kapsam kontrolü yapar.
-- `AGENT.md` isteğe bağlı değildir. Ajan çalıştıran bir program onu bulamazsa
-  `A026` ile durur; ajan istemi bu dosyadan kurulur ve çalışma zamanı bir
-  şartname uydurmaz.
-- `create xaf` ve `create` komutları varsayılan XAF dosyasını oluşturur; `&`
-  ile `connect to <dosya>.xaf` komutuyla zincirlenebilir.
-- `agent { id = "..." }` biçimi kaldırılmıştır ve `A015` verir; yerine
-  `agent connect { id = "..." }` kullanılır.
+| Dosya | İçerik |
+|---|---|
+| [SYNTAX.md](SYNTAX.md) | Güncel dil sözdizimi, modüller, CLI ve tanı kataloğu |
+| [XAF_V2_SCHEMA.md](XAF_V2_SCHEMA.md) | Güncel XAF yapılandırma ve politika şeması |
+| [SANDBOX.md](SANDBOX.md) | Agent sandbox mimarisi ve sınırları |
+| [FUNCTIONS_DESIGN.md](FUNCTIONS_DESIGN.md) | Fonksiyon sözdizimi ve davranışı |
+| [CONTROL_FLOW_DESIGN.md](CONTROL_FLOW_DESIGN.md) | Henüz uygulanmayan koşul tasarımı |
+| [SPH_XAF_COMPLETE_REFERENCE.md](SPH_XAF_COMPLETE_REFERENCE.md) | Geniş birleşik referans; tasarım bölümlerinin uygulandığını varsayma |
 
+## Proje durumu
 
-## Güncel dil çekirdeği: tipler ve ifadeler
-
-`state name: integer = 18` biçiminde açık tip bildirimi ve `state name = 18`
-biçiminde tip çıkarımı desteklenir. Aynı state farklı bir değerle tekrar yazılırsa
-güncellenir; aynı değer tekrar atanırsa `S246` oluşur. `set name = value` mevcut
-state'i açıkça günceller; yeni state oluşturmaz ve türü korur (`S284`, `S289`). Sayısal ifadeler `+ - * / ^`,
-parantez ve `sqrt(...)` içerir. Metin içinde `{state_name}` kullanılarak interpolasyon
-yapılır; metin birleştirmek için `+` kullanılmaz. Mantıksal işlemler ve karşılaştırmalar
-Control Flow'un parser/runtime aşamasında uygulanacaktır; tasarımda `decide / when /
-otherwise`, `not/and/or`, `!=`/`≠`, `>=`/`≥` ve `<=`/`≤` bulunur.
-
-Functions parser/runtime tarafından uygulanmıştır. Control Flow tasarımı `decide / when / otherwise` biçiminde kesinleştirilmiştir; parser/runtime uygulaması henüz yapılmamıştır. Tasarım `CONTROL_FLOW_DESIGN.md` içindedir.
+Sophon geliştirme aşamasındadır. Parser'ın kabul ettiği güncel davranış için [SYNTAX.md](SYNTAX.md) ve [sophon.py](sophon.py) esas alınır; XAF için [XAF_V2_SCHEMA.md](XAF_V2_SCHEMA.md) geçerlidir. Öneri veya hata bildiriminde küçük bir `.sph`/`.xaf` örneği ve beklenen-gerçekleşen davranışı paylaşmak yeterlidir.
