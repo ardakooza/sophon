@@ -1,0 +1,16 @@
+connect to random.xaf
+use { random }
+
+state dice = random.integer(1, 6)
+state probability = random.float()
+state enabled = random.boolean()
+
+state colors = ["red", "green", "blue"]
+state selected_color = random.choice(colors)
+
+surface {
+    "Dice: {dice}"
+    "Probability: {probability}"
+    "Enabled: {enabled}"
+    "Selected color: {selected_color}"
+}

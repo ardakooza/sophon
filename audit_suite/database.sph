@@ -1,0 +1,10 @@
+connect to common.xaf
+use { database }
+state selected = null
+database users {
+    connect = data/users.svt
+    read { id = 1 state = selected }
+    write { id = 2 name = "Grace" age = 29 }
+    modify { id = 2 age = 30 }
+}
+surface { selected }

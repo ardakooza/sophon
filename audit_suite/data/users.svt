@@ -1,0 +1,8 @@
+vault {
+    record {
+        id = 1
+        name = "Ada"
+        age = 31
+        tags = ["math" "science"]
+    }
+}

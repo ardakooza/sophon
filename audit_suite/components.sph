@@ -1,0 +1,10 @@
+connect to common.xaf
+use { component }
+state product = "Sophon"
+state count = 3
+component {
+    id = "dashboard"
+    note { title = "Info" text = product text = "Status: ready" }
+    list { title = "Features" item = "Agent-first" item = "Policy" item = product }
+    table { title = "Metrics" row "name" "value" row "count" count }
+}

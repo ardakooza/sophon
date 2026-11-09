@@ -1,0 +1,6 @@
+connect to common.xaf
+use { database }
+database users {
+    connect = data/users.svt
+    remove { id = 2 }
+}

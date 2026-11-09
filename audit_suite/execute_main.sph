@@ -1,0 +1,3 @@
+connect to common.xaf
+use { execute }
+execute { file = "worker.sph" }

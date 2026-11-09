@@ -1,0 +1,3 @@
+connect to worker.xaf
+state result = "subprogram-ok"
+surface { result }

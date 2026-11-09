@@ -1,0 +1,10 @@
+config {
+    default-policy = 1
+}
+
+policy {
+    id = 1
+    action {
+        read = true
+    }
+}

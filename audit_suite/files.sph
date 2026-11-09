@@ -1,0 +1,17 @@
+connect to common.xaf
+use { file }
+state body = "alpha beta"
+file {
+    mkdir { path = "data/work" }
+    mkdir { path = "archives" }
+    create { path = "data/work/a.txt" }
+    write { path = "data/work/a.txt" data = body }
+    append { path = "data/work/a.txt" data = " gamma" }
+    read { path = "data/work/a.txt" state = contents }
+    list { path = "data/work" state = entries }
+    copy { path = "data/work/a.txt" to = "data/work/b.txt" }
+    move { path = "data/work/b.txt" to = "data/work/c.txt" }
+    zip { path = "data/work" to = "archives/work.zip" }
+    unzip { path = "archives/work.zip" to = "data/extracted" }
+}
+surface { contents entries }

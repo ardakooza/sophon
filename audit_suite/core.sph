@@ -1,0 +1,15 @@
+connect to common.xaf
+use { datetime }
+state integer_value: integer = 12
+state decimal_value: float = 3.5
+state computed: number = integer_value + decimal_value * 2
+state power = 2 ^ 5
+state root = sqrt(81)
+state subject = "Sophon"
+state message = "Hello {subject}; today is {date.weekday}"
+state sequence = [alpha beta 4 true null]
+multi-state { id = "person" state { name = "Ada" age = 31 } }
+multi-state { id = "person" state { age = 32 } }
+state full_name = "Person {person.name}, age {person.age}"
+state next_age = person.age + 1
+surface { computed power root message full_name next_age sequence person.name person.age date.year time.hour }

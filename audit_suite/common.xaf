@@ -1,0 +1,60 @@
+config {
+    default-policy = 9001
+    multi {
+        multi-state
+        multi-ask
+        multi-confirmation
+        multi-observer
+    }
+    observer {
+        1001 {
+            watch = true
+            log = true
+            path = "logs"
+            level = debug
+            action {
+                read = true
+                modify = true
+                create = true
+                remove = true
+                reorder = true
+            }
+        }
+    }
+    database {
+        max-records = 100
+        max-bytes = 200000
+        connection { provider = "local" }
+    }
+    file-system {
+        allowed_path { "data" "logs" "archives" }
+        forbidden_path { "data/private" }
+        action {
+            file { create read modify move copy delete }
+            folder { create read modify move copy delete zip-unzip }
+        }
+    }
+    execute {
+        file { "worker.sph" }
+        command { }
+    }
+    agent {
+        permission { execute = false }
+    }
+}
+
+policy {
+    id = 9001
+    access {
+        multi observer database file-system execute component
+        source { self = true external = true }
+    }
+    action {
+        read = true
+        write = true
+        modify = true
+        remove = true
+        create = true
+        reorder = true
+    }
+}

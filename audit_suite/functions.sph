@@ -1,0 +1,36 @@
+function {
+    id = "calculate"
+    input {
+        a: integer
+        b: integer = 10
+        optional: integer?
+    }
+    execute {
+        state intermediate = a * b
+        state result = intermediate + 10
+    }
+    output: integer = result
+}
+
+function {
+    id = "statistics"
+    input { a: integer b: integer }
+    execute {
+        state sum = a + b
+        state difference = a - b
+    }
+    output { sum difference }
+}
+
+function {
+    id = "greeting"
+    input { name: string }
+    execute { state result = "Hello, {name}" }
+    output: string = result
+}
+
+state total = calculate(2)
+state stats = statistics(9, 4)
+state sum = stats.sum
+state difference = stats.difference
+state greeting_text = greeting("Sophon")

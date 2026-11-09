@@ -1,0 +1,6 @@
+connect to common.xaf
+use { observer }
+state status = "ready"
+multi-state { id = "user" state { name = "Ada" age = 31 } }
+observer { id = 1001 source = self watch { status user.age } }
+surface { status }

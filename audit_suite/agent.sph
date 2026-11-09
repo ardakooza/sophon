@@ -1,0 +1,6 @@
+connect to agent.xaf
+use { agent }
+state answer = ""
+agent connect { id = 7001 }
+agent run { id = 7001 message { "audit request" } output = answer }
+surface { answer }

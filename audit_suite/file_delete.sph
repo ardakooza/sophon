@@ -1,0 +1,7 @@
+connect to common.xaf
+use { file }
+file {
+    mkdir { path = "data/remove-me" }
+    create { path = "data/remove-me/child.txt" }
+    delete { path = "data/remove-me" }
+}

@@ -1,0 +1,28 @@
+connect to common.xaf
+multi-ask {
+    id = "contact"
+    ask { id = "city" prompt = "City:" state = city }
+    ask { id = "country" prompt = "Country:" state = country }
+}
+confirmation {
+    id = "color"
+    prompt = "Color?"
+    choice { red = "red" blue = "blue" }
+    state = color
+}
+multi-confirmation {
+    id = "features"
+    confirmation {
+        id = "notify"
+        prompt = "Notify?"
+        choice { yes = true no = false }
+        state = notify
+    }
+    confirmation {
+        id = "backup"
+        prompt = "Backup?"
+        choice { yes = true no = false }
+        state = backup
+    }
+}
+surface { city country color notify backup }

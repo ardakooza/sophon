@@ -1,0 +1,4 @@
+policy legacy.sph {
+    access { surface }
+    action { read = true }
+}

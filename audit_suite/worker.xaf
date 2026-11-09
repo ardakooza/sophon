@@ -1,0 +1,4 @@
+policy worker.sph {
+    access { surface }
+    action { read = true }
+}

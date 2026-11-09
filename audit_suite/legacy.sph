@@ -1,0 +1,3 @@
+connect to legacy.xaf
+state message = "legacy-compatible"
+surface { message }
